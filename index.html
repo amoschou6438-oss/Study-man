@@ -2084,13 +2084,21 @@ function openDateEdit() {
   }
 }
 
-// ── 便當輪流：2026/3 ~ 2027/1，共11次，太平→台中→坪林循環（點擊下拉選單）──
+// ── 便當輪流：2026/3 ~ 2027/1，共11次（點擊下拉選單）──
+// 2026/3~2026/8：太平→台中→坪林循環
+// 2026/9起改由坪林區負責，之後依續 太平區、台中區、坪林區 輪替至2027/1
 const _areaOrder = ['太平區','台中區','坪林區'];
 const _bentoMonths = [
   {year:2026,month:3},{year:2026,month:4},{year:2026,month:5},
   {year:2026,month:6},{year:2026,month:7},{year:2026,month:8},
   {year:2026,month:9},{year:2026,month:10},{year:2026,month:11},
   {year:2026,month:12},{year:2027,month:1}
+];
+const _bentoAreas = [
+  '太平區','台中區','坪林區',
+  '太平區','台中區','坪林區',
+  '坪林區','太平區','台中區',
+  '坪林區','太平區'
 ];
 let _cachedAreaText = '';
 let _cachedAreaBg = 'var(--gold)';
@@ -2161,7 +2169,7 @@ buildAreaDropdown();
   if (_mIdx === -1) {
     applyBentoArea('本月不輪流');
   } else {
-    applyBentoArea(_areaOrder[_mIdx % _areaOrder.length]);
+    applyBentoArea(_bentoAreas[_mIdx]);
   }
 })();
 
