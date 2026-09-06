@@ -2745,17 +2745,54 @@ function exportElementAsImage(elementId, filename, btnEl) {
   if (typeof html2canvas === 'undefined') { alert('❌ 圖片匯出功能載入失敗，請確認網路連線'); return; }
   const originalText = btnEl ? btnEl.textContent : null;
   if (btnEl) { btnEl.disabled = true; btnEl.textContent = '⏳ 產生圖片中...'; }
-  html2canvas(el, { backgroundColor: '#ffffff', scale: 2, useCORS: true }).then(canvas => {
+
+  // 記錄原始樣式，避免因容器 overflow-x:auto 導致捲動出去的內容被裁切
+  const originalStyle = {
+    width: el.style.width,
+    maxWidth: el.style.maxWidth,
+    overflow: el.style.overflow,
+    overflowX: el.style.overflowX
+  };
+  const originalScrollLeft = el.scrollLeft;
+  el.scrollLeft = 0;
+  el.style.overflow = 'visible';
+  el.style.overflowX = 'visible';
+  el.style.maxWidth = 'none';
+  el.style.width = el.scrollWidth + 'px';
+
+  const fullWidth = el.scrollWidth;
+  const fullHeight = el.scrollHeight;
+
+  const restore = () => {
+    el.style.width = originalStyle.width;
+    el.style.maxWidth = originalStyle.maxWidth;
+    el.style.overflow = originalStyle.overflow;
+    el.style.overflowX = originalStyle.overflowX;
+    el.scrollLeft = originalScrollLeft;
+    if (btnEl) { btnEl.disabled = false; btnEl.textContent = originalText; }
+  };
+
+  html2canvas(el, {
+    backgroundColor: '#ffffff',
+    scale: 2,
+    useCORS: true,
+    width: fullWidth,
+    height: fullHeight,
+    windowWidth: fullWidth,
+    windowHeight: fullHeight,
+    scrollX: 0,
+    scrollY: 0
+  }).then(canvas => {
+    restore();
     canvas.toBlob(blob => {
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = filename;
       a.click();
-      if (btnEl) { btnEl.disabled = false; btnEl.textContent = originalText; }
     });
   }).catch(err => {
+    restore();
     alert('❌ 圖片匯出失敗：' + err.message);
-    if (btnEl) { btnEl.disabled = false; btnEl.textContent = originalText; }
   });
 }
 
