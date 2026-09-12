@@ -3222,12 +3222,143 @@ function exportRecordImage(evt) {
 
 function exportBentoImage(evt) {
   const btn = evt && evt.target ? evt.target : (window.event && window.event.target);
-  exportElementAsImage('bento-export-area', '便當名單.png', btn);
+  if (typeof html2canvas !== 'function') {
+    alert('❌ 圖片匯出功能載入失敗，請確認網路連線');
+    return;
+  }
+  const originalHtml = btn ? btn.innerHTML : '';
+  if (btn) { btn.innerHTML = '⏳ 產生圖片中...'; btn.disabled = true; }
+
+  const dateLabel = document.getElementById('date-bento')?.textContent || '';
+  const areaLabel = document.getElementById('bento-area-badge')?.textContent || '';
+  const wrap = document.getElementById('bento-export-area');
+
+  // 直接把內容複製到一個附加在 <body> 底下、畫面外的獨立容器再截圖，
+  // 這樣無論目前是否停留在「便當分配」分頁（該分頁未切換時是 display:none），都能正確產生圖片。
+  const holder = document.createElement('div');
+  holder.style.position = 'fixed';
+  holder.style.left = '-99999px';
+  holder.style.top = '0';
+  holder.style.background = '#ffffff';
+  holder.style.padding = '20px';
+  holder.style.display = 'inline-block';
+  holder.style.fontFamily = "'Noto Sans TC', sans-serif";
+  holder.innerHTML = `<div style="font-family:'Noto Serif TC',serif;font-size:1.15rem;font-weight:900;color:#1a1a2e;margin-bottom:14px;">🍱 ${dateLabel} 便當分配表${areaLabel ? `　<span style="font-size:0.85rem;font-weight:600;background:#c9a84c;color:#1a1a2e;padding:3px 14px;border-radius:20px;">${areaLabel}</span>` : ''}</div>`;
+
+  if (wrap) {
+    const clone = wrap.cloneNode(true);
+
+    // 篩選按鈕、匯出按鈕在圖片中無作用，移除
+    const filterBar = clone.querySelector('#bento-filter-bar');
+    if (filterBar) filterBar.remove();
+    const exportBtn = clone.querySelector('button');
+    if (exportBtn) exportBtn.remove();
+
+    // textarea 的即時輸入值不會被 cloneNode 帶入，改用純文字呈現
+    const staffTextarea = document.getElementById('meal-staff-names');
+    const cloneStaffTextarea = clone.querySelector('#meal-staff-names');
+    if (cloneStaffTextarea) {
+      const div = document.createElement('div');
+      div.style.cssText = cloneStaffTextarea.getAttribute('style') || '';
+      div.style.whiteSpace = 'pre-wrap';
+      div.style.minHeight = '2.2em';
+      div.style.boxSizing = 'border-box';
+      div.textContent = staffTextarea ? staffTextarea.value : '';
+      cloneStaffTextarea.replaceWith(div);
+    }
+    const noBentoTextarea = document.getElementById('no-bento-names');
+    const cloneNoBentoTextarea = clone.querySelector('#no-bento-names');
+    if (cloneNoBentoTextarea) {
+      const div = document.createElement('div');
+      div.style.cssText = cloneNoBentoTextarea.getAttribute('style') || '';
+      div.style.whiteSpace = 'pre-wrap';
+      div.style.minHeight = '2.2em';
+      div.style.boxSizing = 'border-box';
+      div.textContent = noBentoTextarea ? noBentoTextarea.value : '';
+      cloneNoBentoTextarea.replaceWith(div);
+    }
+    holder.appendChild(clone);
+  }
+  document.body.appendChild(holder);
+
+  html2canvas(holder, {
+    backgroundColor: '#ffffff',
+    scale: 2,
+    useCORS: true
+  }).then(canvas => {
+    canvas.toBlob(blob => {
+      const url = URL.createObjectURL(blob);
+      const now = new Date();
+      const pad = n => String(n).padStart(2, '0');
+      const stamp = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`;
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `便當名單_${stamp}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      document.body.removeChild(holder);
+      if (btn) { btn.innerHTML = originalHtml; btn.disabled = false; }
+    }, 'image/png');
+  }).catch(err => {
+    document.body.removeChild(holder);
+    alert('❌ 圖片匯出失敗：' + err.message);
+    if (btn) { btn.innerHTML = originalHtml; btn.disabled = false; }
+  });
 }
 
 function exportAttendanceImage(evt) {
   const btn = evt && evt.target ? evt.target : (window.event && window.event.target);
-  exportElementAsImage('attend-export-area', '出席統計名單.png', btn);
+  if (typeof html2canvas !== 'function') {
+    alert('❌ 圖片匯出功能載入失敗，請確認網路連線');
+    return;
+  }
+  const originalHtml = btn ? btn.innerHTML : '';
+  if (btn) { btn.innerHTML = '⏳ 產生圖片中...'; btn.disabled = true; }
+
+  const dateLabel = document.getElementById('date-attend')?.textContent || '';
+  const gridWrap = document.getElementById('attend-export-area');
+
+  // 直接把內容複製到一個附加在 <body> 底下、畫面外的獨立容器再截圖，
+  // 這樣無論目前是否停留在「出席統計」分頁（該分頁未切換時是 display:none），都能正確產生圖片。
+  const holder = document.createElement('div');
+  holder.style.position = 'fixed';
+  holder.style.left = '-99999px';
+  holder.style.top = '0';
+  holder.style.background = '#ffffff';
+  holder.style.padding = '20px';
+  holder.style.display = 'inline-block';
+  holder.style.fontFamily = "'Noto Sans TC', sans-serif";
+  holder.innerHTML = `<div style="font-family:'Noto Serif TC',serif;font-size:1.15rem;font-weight:900;color:#1a1a2e;margin-bottom:14px;">📋 ${dateLabel} 報名人員統計表</div>`;
+  if (gridWrap) holder.appendChild(gridWrap.cloneNode(true));
+  document.body.appendChild(holder);
+
+  html2canvas(holder, {
+    backgroundColor: '#ffffff',
+    scale: 2,
+    useCORS: true
+  }).then(canvas => {
+    canvas.toBlob(blob => {
+      const url = URL.createObjectURL(blob);
+      const now = new Date();
+      const pad = n => String(n).padStart(2, '0');
+      const stamp = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`;
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `參加名單_${stamp}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      document.body.removeChild(holder);
+      if (btn) { btn.innerHTML = originalHtml; btn.disabled = false; }
+    }, 'image/png');
+  }).catch(err => {
+    document.body.removeChild(holder);
+    alert('❌ 圖片匯出失敗：' + err.message);
+    if (btn) { btn.innerHTML = originalHtml; btn.disabled = false; }
+  });
 }
 
 </script>
