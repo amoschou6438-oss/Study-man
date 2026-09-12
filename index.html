@@ -65,6 +65,28 @@
   .main { padding: 2rem; max-width: 1200px; margin: 0 auto; }
   .page { display: none; }
   .page.active { display: block; }
+  .app-screen { display: none; }
+  .app-screen.active { display: block; }
+
+  /* 主畫面：功能鈕格線 */
+  .home-fn-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.2rem; }
+  .home-fn-card {
+    background: var(--white); border-radius: 16px; box-shadow: var(--shadow-lg);
+    border: 1px solid var(--border); padding: 1.6rem 1.2rem;
+    display: flex; flex-direction: column; align-items: center; text-align: center; gap: 0.7rem;
+  }
+  /* 卡片總數為奇數時，最後一張撐滿整列並置中，不單獨卡在左邊 */
+  .home-fn-grid > .home-fn-card:last-child:nth-child(odd) {
+    grid-column: 1 / -1; max-width: 420px; margin: 0 auto; width: 100%;
+  }
+  @media (max-width: 600px) {
+    .home-fn-grid { gap: 0.7rem; }
+    .home-fn-card { padding: 1.1rem 0.7rem; gap: 0.5rem; }
+    .home-fn-card > div:first-child { font-size: 1.6rem; }
+    .home-fn-card > div:nth-child(2) { font-size: 0.85rem; }
+    .home-fn-card > div:nth-child(3) { font-size: 0.7rem; }
+    .home-fn-card button { font-size: 0.72rem; padding: 7px 0; }
+  }
 
   .section-title {
     font-family: 'Noto Serif TC', serif; font-size: 1.5rem; font-weight: 700;
@@ -424,14 +446,62 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 </head>
 <body>
 
+<!-- ══ 畫面一：管理主畫面（獨立畫面，不與其他介面並列）══ -->
+<div class="app-screen active" id="screen-home">
+  <div class="header">
+    <div class="header-title"><span class="dot"></span>蕭氏學人班 管理系統</div>
+    <div class="header-badge">中一區 ‧ 2026年版 ‧ <span id="date-badge-home"></span></div>
+  </div>
+  <div class="main">
+    <div class="section-title">🏠 管理主畫面</div>
+    <div class="home-fn-grid">
+
+      <div class="home-fn-card">
+        <div style="font-size:2rem;">👥</div>
+        <div style="font-weight:700;font-size:0.95rem;color:var(--teal);">人員名單</div>
+        <div style="font-size:0.78rem;color:var(--muted);line-height:1.6;flex:1;">查看與管理所有學員、學輔、資輔名單</div>
+        <button onclick="goToPage('members')" style="padding:8px 0;width:100%;background:var(--teal);color:white;border:none;border-radius:20px;font-size:0.82rem;font-weight:700;cursor:pointer;font-family:'Noto Sans TC',sans-serif;">➡️ 進入人員名單</button>
+      </div>
+
+      <div class="home-fn-card">
+        <div style="font-size:2rem;">✅</div>
+        <div style="font-weight:700;font-size:0.95rem;color:#1565c0;">參加名單</div>
+        <div style="font-size:0.78rem;color:var(--muted);line-height:1.6;flex:1;">將本次報名人員統計表匯出成一張圖片</div>
+        <button onclick="exportAttendanceImage(this)" style="padding:8px 0;width:100%;background:#1565c0;color:white;border:none;border-radius:20px;font-size:0.82rem;font-weight:700;cursor:pointer;font-family:'Noto Sans TC',sans-serif;">🖼️ 參加名單匯出</button>
+      </div>
+
+      <div class="home-fn-card">
+        <div style="font-size:2rem;">🍱</div>
+        <div style="font-weight:700;font-size:0.95rem;color:#0f6e3a;">便當名單</div>
+        <div style="font-size:0.78rem;color:var(--muted);line-height:1.6;flex:1;">將本次便當分配內容匯出成一張圖片</div>
+        <button onclick="exportBentoImage(this)" style="padding:8px 0;width:100%;background:#0f6e3a;color:white;border:none;border-radius:20px;font-size:0.82rem;font-weight:700;cursor:pointer;font-family:'Noto Sans TC',sans-serif;">🖼️ 便當名單匯出</button>
+      </div>
+
+      <div class="home-fn-card">
+        <div style="font-size:2rem;">💾</div>
+        <div style="font-weight:700;font-size:0.95rem;color:#8B6914;">一鍵備份／恢復</div>
+        <div style="font-size:0.78rem;color:var(--muted);line-height:1.6;flex:1;">將人員名單、出席記錄、人員生日一次備份成一個檔案，或從備份檔一次恢復</div>
+        <div style="display:flex;gap:0.6rem;width:100%;">
+          <button onclick="exportFullBackup()" style="padding:8px 0;flex:1;background:#8B6914;color:white;border:none;border-radius:20px;font-size:0.82rem;font-weight:700;cursor:pointer;font-family:'Noto Sans TC',sans-serif;">💾 一鍵備份</button>
+          <button onclick="triggerImportFullBackup()" style="padding:8px 0;flex:1;background:#c9a84c;color:white;border:none;border-radius:20px;font-size:0.82rem;font-weight:700;cursor:pointer;font-family:'Noto Sans TC',sans-serif;">📤 一鍵恢復</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+<!-- ══ 畫面二：其他管理介面（獨立畫面，含導覽列與各功能頁）══ -->
+<div class="app-screen" id="screen-app">
+
 <div class="header">
   <div class="header-title"><span class="dot"></span>蕭氏學人班 管理系統</div>
   <div class="header-badge">中一區 ‧ 2026年版 ‧ <span id="date-badge"></span></div>
 </div>
 
 <nav class="nav">
+  <button class="nav-btn" id="nav-btn-home" onclick="goHome()">🏠 返回主畫面</button>
   <button class="nav-btn active" onclick="showPage('dashboard',this)">📊 總覽</button>
-  <button class="nav-btn" onclick="showPage('members',this)">👥 人員名單</button>
+  <button class="nav-btn" id="nav-btn-members" onclick="showPage('members',this)">👥 人員名單</button>
   <button class="nav-btn" onclick="showPage('attendance',this)">✅ 出席統計</button>
   <button class="nav-btn" onclick="showPage('bento',this)">🍱 便當分配</button>
   <button class="nav-btn" id="nav-manage" onclick="showPage('manage',this)">⚙️ 資料輸入及編輯</button>
@@ -872,6 +942,8 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   </div>
 
 </div><!-- end main -->
+
+</div><!-- end screen-app -->
 
 <script>
 // ══════════════════════════════════════════
@@ -2251,6 +2323,129 @@ function showPage(id, btn) {
   if (id === 'manage') renderManagePage();
 }
 
+// 供主畫面卡片按鈕呼叫，切換到「其他介面」畫面並顯示對應頁面
+function goToPage(id) {
+  document.getElementById('screen-home').classList.remove('active');
+  document.getElementById('screen-app').classList.add('active');
+  const btn = document.getElementById('nav-btn-' + id);
+  if (btn) showPage(id, btn);
+}
+
+// 從「其他介面」畫面返回獨立的管理主畫面
+function goHome() {
+  document.getElementById('screen-app').classList.remove('active');
+  document.getElementById('screen-home').classList.add('active');
+}
+
+// ══════════════════════════════════════════
+// 主畫面「一鍵備份／一鍵恢復」
+// 整合：人員名單、出席記錄、人員生日（出生日期），一次備份／恢復成單一檔案
+// ══════════════════════════════════════════
+function exportFullBackup() {
+  loadMonthlyRecord();
+  const data = {
+    exportType: 'xrb_full_backup',
+    exportVersion: 1,
+    exportDate: new Date().toISOString(),
+    members: JSON.parse(JSON.stringify(allMembers)),
+    staffNames:   document.getElementById('meal-staff-names')?.value || '',
+    noBentoNames: document.getElementById('no-bento-names')?.value || '',
+    memberBirthdayExtra: JSON.parse(JSON.stringify(memberBirthdayExtra)),
+    monthlyRecord: monthlyRecord
+  };
+  const json = JSON.stringify(data, null, 2);
+  const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const stamp = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`;
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `蕭氏學人班一鍵備份_${stamp}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  alert(`✅ 已完成一鍵備份！\n共 ${allMembers.length} 筆人員資料、${Object.keys(monthlyRecord).length} 位學員的出席記錄。\n\n備份檔已下載，請妥善保存。`);
+}
+
+function triggerImportFullBackup() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json,application/json';
+  input.onchange = handleImportFullBackup;
+  input.click();
+}
+
+function handleImportFullBackup(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const d = JSON.parse(e.target.result);
+      if (!d || !Array.isArray(d.members) || d.members.length === 0) {
+        throw new Error('檔案格式不正確，找不到人員名單資料');
+      }
+      const recordCount = d.monthlyRecord && typeof d.monthlyRecord === 'object'
+        ? Object.keys(d.monthlyRecord).length : 0;
+      const ok = confirm(
+        `確定要恢復此一鍵備份嗎？\n共 ${d.members.length} 筆人員資料、${recordCount} 位學員的出席記錄。\n` +
+        `恢復後將覆蓋目前的人員名單、出席記錄、人員生日，此動作無法復原。`
+      );
+      if (!ok) { event.target.value = ''; return; }
+
+      // 1) 人員名單
+      allMembers.length = 0;
+      d.members.forEach(m => {
+        if (m.familyOrder === undefined) m.familyOrder = 1;
+        allMembers.push(m);
+      });
+      allMembers.forEach((m, i) => { m.no = i + 1; });
+
+      // 2) 人員生日（出生日期）— 完全以備份檔為準
+      if (d.memberBirthdayExtra && typeof d.memberBirthdayExtra === 'object') {
+        Object.keys(memberBirthdayExtra).forEach(k => delete memberBirthdayExtra[k]);
+        Object.assign(memberBirthdayExtra, d.memberBirthdayExtra);
+      }
+
+      // 3) 出席記錄
+      if (d.monthlyRecord && typeof d.monthlyRecord === 'object') {
+        monthlyRecord = d.monthlyRecord;
+        saveMonthlyRecord();
+      }
+
+      if (typeof d.staffNames === 'string') {
+        const el = document.getElementById('meal-staff-names');
+        if (el) el.value = d.staffNames;
+      }
+      if (typeof d.noBentoNames === 'string') {
+        const el = document.getElementById('no-bento-names');
+        if (el) el.value = d.noBentoNames;
+      }
+
+      saveData();
+      renderMembers();
+      syncAll();
+      if (typeof renderRecord === 'function') renderRecord();
+      if (typeof renderBirthdayPage === 'function') renderBirthdayPage();
+
+      const timeInfo = d.exportDate ? `（備份時間：${new Date(d.exportDate).toLocaleString('zh-TW')}）` : '';
+      alert(`✅ 已完成一鍵恢復！\n共 ${allMembers.length} 筆人員資料、${recordCount} 位學員的出席記錄 ${timeInfo}`);
+    } catch (err) {
+      alert('❌ 讀取備份檔案失敗，請確認檔案格式是否正確（需為本系統匯出之一鍵備份 .json 檔）。\n' + (err && err.message ? err.message : ''));
+    } finally {
+      event.target.value = '';
+    }
+  };
+  reader.onerror = function() {
+    alert('❌ 讀取檔案失敗');
+  };
+  reader.readAsText(file, 'utf-8');
+}
+
 
 // ── 計算當月第三個禮拜日 ──
 function getThirdSunday(year, month) {
@@ -2288,7 +2483,7 @@ function getDisplayDateStr() {
 }
 function applyDateStr() {
   const s = getDisplayDateStr();
-  ['date-attend','date-bento','date-badge'].forEach(id => {
+  ['date-attend','date-bento','date-badge','date-badge-home'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.textContent = s;
   });
