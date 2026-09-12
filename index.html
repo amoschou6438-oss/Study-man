@@ -150,6 +150,14 @@
   .badge-乾道 { background: #fff3e0; color: #e65100; }
   .badge-坤道 { background: #fce4ec; color: #c2185b; }
 
+  .btn-bday-edit {
+    padding: 4px 12px; border-radius: 14px; border: 1px solid var(--teal);
+    background: transparent; color: var(--teal); cursor: pointer;
+    font-family: 'Noto Sans TC', sans-serif; font-size: 0.72rem; font-weight: 600;
+    white-space: nowrap; transition: all 0.15s;
+  }
+  .btn-bday-edit:hover { background: var(--teal); color: white; }
+
   /* Toggle buttons */
   .toggle-btn {
     display: inline-flex; align-items: center; gap: 4px;
@@ -428,6 +436,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   <button class="nav-btn" onclick="showPage('bento',this)">🍱 便當分配</button>
   <button class="nav-btn" id="nav-manage" onclick="showPage('manage',this)">⚙️ 資料輸入及編輯</button>
   <button class="nav-btn" onclick="showPage('record',this);renderRecord()">📅 出席記錄</button>
+  <button class="nav-btn" id="nav-btn-birthday" onclick="showPage('birthday',this);renderBirthdayPage()">🎂 生日名單</button>
 </nav>
 
 <div class="main">
@@ -815,6 +824,41 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     <div id="record-page-content"></div>
   </div>
 
+  <!-- ══ PAGE: BIRTHDAY（生日名單）══ -->
+  <div class="page" id="page-birthday">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.7rem;margin-bottom:1.2rem;">
+      <div class="section-title" style="margin-bottom:0;">🎂 人員生日一覽</div>
+    </div>
+    <div class="note-box" style="margin-bottom:1.2rem;">
+      <div class="note-title">📖 資料說明</div>
+      <div class="note-text">
+        名單即「人員名單」中目前所有成員，出生日期可點列表最右側「✎ 修改」自行編輯（會自動存檔）；<br>
+        身份、乾坤、地區皆依「人員名單」即時同步 — 在人員名單修改身份、新增或刪除人員後，本頁會自動更新並重新排序；<br>
+        排列順序：先乾道、後坤道，各組內先策劃、次陪班、後學員，同組再依出生日期由前到後排序；<br>
+        僅查得出生年份、無月日資料者可於出生日期欄位填寫如「1980年（無月日資料）」，會自動排在同組最後。
+      </div>
+    </div>
+    <div class="table-wrap">
+      <div class="table-header-row">
+        <h3>全體人員 生日一覽</h3>
+      </div>
+      <table id="birthday-table">
+        <thead>
+          <tr>
+            <th style="width:44px;">序號</th>
+            <th style="width:56px;">身份</th>
+            <th style="width:56px;">乾坤</th>
+            <th style="width:56px;">地區</th>
+            <th style="width:70px;">姓名</th>
+            <th style="width:100px;">出生日期</th>
+            <th style="width:80px;">編輯</th>
+          </tr>
+        </thead>
+        <tbody id="birthday-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- ══ FULL ATTENDANCE (全勤) MODAL ══ -->
   <div class="modal-overlay" id="full-attendance-modal">
     <div class="modal" style="max-width:460px;">
@@ -886,6 +930,160 @@ const allMembers = [
 ];
 
 // ══════════════════════════════════════════
+// 人員生日 額外欄位對照表（僅出生日期 bd，不含理天生日）— 依「姓名」對應「人員名單」(allMembers)
+// 姓名欄顯示直接取自人員名單；可在「生日名單」頁面點 ✎ 修改，資料會自動存檔
+// 以下已依「童蒙」「青少」兩班現有資料，比對同姓名者直接帶入出生日期，其餘尚無資料者留空待補：
+// （少數同姓名在不同班別資料不一致者，已採較完整或較新之版本，仍建議自行核對）
+// ══════════════════════════════════════════
+const memberBirthdayExtra = {
+  "家銘": {bd:"1969/08/19"},
+  "普文": {bd:"1977/03/07"},
+  "嫺雅": {bd:"1967/07/25"},
+  "瓊瑤": {bd:"1970年（無月日資料）"},
+  "靜兒": {bd:"1980年（無月日資料）"},
+  "智憲": {bd:"1998/12/25"},
+  "智穎": {bd:"2004/01/04"},
+  "皓程": {bd:"2004/08/07"},
+  "少庸": {bd:"2007/04/18"},
+  "宛君": {bd:"1993/05/23"},
+  "詠晴": {bd:"2012/02/14"},
+  "佩君": {bd:"1993/05/23"},
+  "吉男": {bd:"1963/07/02"},
+  "鄭強": {bd:"1970/03/29"},
+  "月嬌": {bd:"1973/07/12"},
+  "益美": {bd:"1975/02/11"},
+  "宏銘": {bd:"1977/06/09"},
+  "忠緯": {bd:"1994/07/22"},
+  "義舜": {bd:"1991/12/1"},
+  "玟娜": {bd:"1999/07/25"},
+  "文君": {bd:"2000/2/2"},
+  "妤嫻": {bd:"2001/11/30"},
+  "坤財": {bd:"1967/04/01"},
+  "昆秦": {bd:"1980/09/10"},
+  "文聰": {bd:"1974/08/31"},
+  "明輝": {bd:"1975/03/08"},
+  "怡珍": {bd:"1969/05/26"},
+  "濬綾": {bd:"1976/12/08"},
+  "湘梅": {bd:"1975/1/17"},
+  "仁成": {bd:"1956/10/12"},
+  "志文": {bd:"1975/12/4"},
+  "竣棠": {bd:"2015/01/26"},
+  "靜瑜": {bd:"1974/09/26"},
+  "雅如": {bd:"1994/10/12"},
+  "妙慧": {bd:"1999/09/22"},
+  "珮安": {bd:"2000/11/03"},
+  "淑貞": {bd:"1975/11/10"},
+};
+
+// 把生日字串轉成可比較的數值 key（年*10000+月*100+日），避免因日期未補零（如 "1991/12/1"）
+// 造成文字比較順序錯誤；僅有年份「YYYY年（無月日資料）」的視為當年度最後（sentinel 1301 大於任何合法月日組合）
+// 無法解析的字串回傳 null（視同「沒有生日資料」）
+function bdSortKey(bd) {
+  if (!bd) return null;
+  const full = bd.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
+  if (full) {
+    const y = parseInt(full[1], 10), m = parseInt(full[2], 10), d = parseInt(full[3], 10);
+    return y * 10000 + m * 100 + d;
+  }
+  const yearOnly = bd.match(/^(\d{4})年/);
+  if (yearOnly) {
+    return parseInt(yearOnly[1], 10) * 10000 + 1301;
+  }
+  return null;
+}
+
+// 通用「依出生年月日排序」比較函式：
+// ‧ 兩人都有生日 → 生日早的（年紀較長）排前面
+// ‧ 只有一人有生日 → 沒有生日資料的人維持原本名單順序，排在前面
+// ‧ 兩人都沒有生日 → 維持原本名單順序（依 no）
+function compareBirthdate(a, b) {
+  const ka = bdSortKey(a.bd), kb = bdSortKey(b.bd);
+  if (ka != null && kb != null) {
+    if (ka !== kb) return ka - kb;
+    return (a.no ?? 9999) - (b.no ?? 9999);
+  }
+  if (ka != null && kb == null) return 1;
+  if (ka == null && kb != null) return -1;
+  return (a.no ?? 9999) - (b.no ?? 9999);
+}
+
+// 身份分組排序（同乾坤內，先後順序）— 與人員名單、便當分配表一致
+const ROLE_ORDER_BDAY = { '策劃': 0, '陪班': 1, '學員': 2 };
+
+// 依「目前人員名單」即時組出「生日名單」頁要顯示的資料列
+// 身份／乾坤／地區一律取自 allMembers（人員名單異動會自動反映在這裡）
+// bd（出生日期）取自 memberBirthdayExtra（可在頁面上編輯）
+function getMemberBirthdayRows() {
+  return allMembers
+    .map(m => {
+      const ex = memberBirthdayExtra[m.name] || {};
+      return { no: m.no, name: m.name, role: m.role, gender: m.gender, area: m.area,
+               bd: ex.bd || '' };
+    })
+    .sort((a, b) => {
+      const ga = a.gender === '乾道' ? 0 : 1, gb = b.gender === '乾道' ? 0 : 1;
+      if (ga !== gb) return ga - gb;
+      const ra = ROLE_ORDER_BDAY[a.role] ?? 9, rb = ROLE_ORDER_BDAY[b.role] ?? 9;
+      if (ra !== rb) return ra - rb;
+      return compareBirthdate(a, b);
+    });
+}
+
+function renderBirthdayPage() {
+  const tbody = document.getElementById('birthday-tbody');
+  if (!tbody) return;
+  const rows = getMemberBirthdayRows();
+  let html = '';
+  let lastGroup = null;
+  rows.forEach((m, i) => {
+    const groupKey = m.gender + m.role;
+    if (groupKey !== lastGroup) {
+      const label = `▌ ${m.gender}・${m.role}`;
+      html += `<tr class="record-sep-row"><td colspan="7">${label}</td></tr>`;
+      lastGroup = groupKey;
+    }
+    html += `<tr>
+      <td>${i+1}</td>
+      <td><span class="badge badge-${m.role}">${m.role}</span></td>
+      <td><span class="badge badge-${m.gender}">${m.gender}</span></td>
+      <td>${m.area}</td>
+      <td class="name">${m.name}</td>
+      <td>${m.bd || '—'}</td>
+      <td><button type="button" class="btn-bday-edit" onclick="openEditMemberBirthday('${m.name}')">✎ 修改</button></td>
+    </tr>`;
+  });
+  tbody.innerHTML = html;
+}
+
+// ── 修改「生日名單」出生日期 ──
+function openEditMemberBirthday(name) {
+  const ex = memberBirthdayExtra[name] || {};
+  const existing = document.getElementById('edit-bday-modal');
+  if (existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'edit-bday-modal';
+  modal.className = 'modal-overlay open';
+  modal.innerHTML = `
+    <div class="modal">
+      <div class="modal-title">✏️ 修改生日資料 — ${name}</div>
+      <div class="modal-field"><label>出生日期</label><input type="text" id="edit-bday-bd" value="${(ex.bd||'').replace(/"/g,'&quot;')}" placeholder="例：1991/07/31 或 1980年（無月日資料）"></div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="document.getElementById('edit-bday-modal').remove()">取消</button>
+        <button class="btn-confirm" onclick="confirmEditMemberBirthday('${name}')">✔ 確認修改</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+function confirmEditMemberBirthday(name) {
+  const bd = document.getElementById('edit-bday-bd').value.trim();
+  memberBirthdayExtra[name] = { bd };
+  saveData();
+  renderBirthdayPage();
+  const modal = document.getElementById('edit-bday-modal');
+  if (modal) modal.remove();
+}
+
+// ══════════════════════════════════════════
 // localStorage 自動儲存（完整物件版）
 // ══════════════════════════════════════════
 const LS_KEY_QSB = 'xrb_data_v2';
@@ -894,7 +1092,8 @@ function saveData() {
   const data = {
     members:      JSON.parse(JSON.stringify(allMembers)), // 完整備份所有人員資料
     staffNames:   document.getElementById('meal-staff-names')?.value || '',
-    noBentoNames: document.getElementById('no-bento-names')?.value || ''
+    noBentoNames: document.getElementById('no-bento-names')?.value || '',
+    memberBirthdayExtra: memberBirthdayExtra // 人員生日（出生日期）
   };
   localStorage.setItem(LS_KEY_QSB, JSON.stringify(data));
 }
@@ -913,6 +1112,10 @@ function loadData() {
     }
     if (d.staffNames !== undefined) { const el = document.getElementById('meal-staff-names'); if (el) el.value = d.staffNames; }
     if (d.noBentoNames) { const el = document.getElementById('no-bento-names'); if (el) el.value = d.noBentoNames; }
+    // 若使用者曾在「生日名單」頁面上修改過，載入時以 localStorage 為準
+    if (d.memberBirthdayExtra && typeof d.memberBirthdayExtra === 'object') {
+      Object.assign(memberBirthdayExtra, d.memberBirthdayExtra);
+    }
   } catch(e) {}
 }
 
@@ -926,7 +1129,8 @@ function backupMembers() {
     exportDate: new Date().toISOString(),
     members:      JSON.parse(JSON.stringify(allMembers)),
     staffNames:   document.getElementById('meal-staff-names')?.value || '',
-    noBentoNames: document.getElementById('no-bento-names')?.value || ''
+    noBentoNames: document.getElementById('no-bento-names')?.value || '',
+    memberBirthdayExtra: JSON.parse(JSON.stringify(memberBirthdayExtra))
   };
   const json = JSON.stringify(backup, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
@@ -971,6 +1175,10 @@ function restoreMembers(file) {
       if (!Array.isArray(data)) {
         if (data.staffNames !== undefined) { const el = document.getElementById('meal-staff-names'); if (el) el.value = data.staffNames; }
         if (data.noBentoNames !== undefined) { const el = document.getElementById('no-bento-names'); if (el) el.value = data.noBentoNames; }
+        if (data.memberBirthdayExtra && typeof data.memberBirthdayExtra === 'object') {
+          Object.keys(memberBirthdayExtra).forEach(k => delete memberBirthdayExtra[k]);
+          Object.assign(memberBirthdayExtra, data.memberBirthdayExtra);
+        }
       }
       saveData();
       syncAll();
@@ -2031,6 +2239,8 @@ function syncAll() {
   renderAttendGrid();
   renderBento();
   if (document.getElementById('page-record')?.classList.contains('active')) renderRecord();
+  // 人員名單（身份／乾坤／地區／新增／刪除）異動後，「生日名單」頁需同步更新身份與排序
+  renderBirthdayPage();
 }
 
 function showPage(id, btn) {
