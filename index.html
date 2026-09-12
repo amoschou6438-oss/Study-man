@@ -3186,7 +3186,21 @@ function exportElementAsImage(elementId, filename, btnEl) {
     windowWidth: fullWidth,
     windowHeight: fullHeight,
     scrollX: 0,
-    scrollY: 0
+    scrollY: 0,
+    onclone: (clonedDoc) => {
+      // 若此區塊目前位於尚未切換進去的隱藏分頁（.app-screen / .page 未加上 active），
+      // html2canvas 抓到的高度/寬度會是 0，導致從主畫面直接匯出時「看似沒反應」。
+      // 這裡只針對「複製出來、離屏渲染用」的畫面強制顯示，不影響使用者實際看到的畫面。
+      let node = clonedDoc.getElementById(elementId);
+      let anc = node;
+      while (anc) {
+        if (anc.classList && (anc.classList.contains('app-screen') || anc.classList.contains('page'))) {
+          anc.classList.add('active');
+          anc.style.display = 'block';
+        }
+        anc = anc.parentElement;
+      }
+    }
   }).then(canvas => {
     restore();
     canvas.toBlob(blob => {
