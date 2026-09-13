@@ -949,6 +949,12 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 // ══════════════════════════════════════════
 // DATA
 // ══════════════════════════════════════════
+// 班會負責人：出席統計、便當分配排序時永遠排在最前面
+const CLASS_LEADER_NAMES = ['吉男', '瓊瑤'];
+function leaderPriority(name) {
+  const idx = CLASS_LEADER_NAMES.indexOf(name);
+  return idx === -1 ? 999 : idx;
+}
 const allMembers = [
   {no:1,role:"策劃",gender:"乾道",area:"台中",code:"1-1",name:"家銘",attend:true,noBento:false,family:"家銘",familyOrder:1},
   {no:2,role:"策劃",gender:"乾道",area:"台中",code:"1-1",name:"普文",attend:false,noBento:false,family:"普文",familyOrder:1},
@@ -1079,6 +1085,32 @@ function compareBirthdate(a, b) {
   return (a.no ?? 9999) - (b.no ?? 9999);
 }
 
+// 取得某位人員（allMembers 中的物件，需含 name）目前的出生日期字串（無資料則回傳空字串）
+function getMemberBd(member) {
+  if (!member || !member.name) return '';
+  const ex = memberBirthdayExtra[member.name];
+  return (ex && ex.bd) || '';
+}
+
+// ══════════════════════════════════════════
+// 通用「在原有排序基礎上，加入出生年月日排序」比較函式
+// 用於「人員名單」「出席統計」「便當分配」三頁的人名排序：
+// ‧ 兩人都有出生日期 → 出生日期早的（年紀較長）排前面
+// ‧ 只有一人有出生日期 → 沒有出生日期資料的人維持原本排序，排在前面
+// ‧ 兩人都沒有出生日期，或出生日期完全相同 → 呼叫 fallbackFn(a, b) 維持原本排序邏輯
+// fallbackFn 為既有排序中「同組內最後的排序依據」（例如依 no 或依家庭在名單中出現順序）
+// ══════════════════════════════════════════
+function compareByBirthdateThenFallback(a, b, fallbackFn) {
+  const ka = bdSortKey(getMemberBd(a)), kb = bdSortKey(getMemberBd(b));
+  if (ka != null && kb != null) {
+    if (ka !== kb) return ka - kb;
+    return fallbackFn(a, b);
+  }
+  if (ka != null && kb == null) return 1;
+  if (ka == null && kb != null) return -1;
+  return fallbackFn(a, b);
+}
+
 // 身份分組排序（同乾坤內，先後順序）— 與人員名單、便當分配表一致
 const ROLE_ORDER_BDAY = { '策劃': 0, '陪班': 1, '學員': 2 };
 
@@ -1097,6 +1129,8 @@ function getMemberBirthdayRows() {
       if (ga !== gb) return ga - gb;
       const ra = ROLE_ORDER_BDAY[a.role] ?? 9, rb = ROLE_ORDER_BDAY[b.role] ?? 9;
       if (ra !== rb) return ra - rb;
+      const pa = leaderPriority(a.name), pb = leaderPriority(b.name);
+      if (pa !== pb) return pa - pb;
       return compareBirthdate(a, b);
     });
 }
@@ -1319,7 +1353,14 @@ function renderMembers() {
       if (ra !== rb) return ra - rb;
       const ga = a.gender === '乾道' ? 0 : 1, gb = b.gender === '乾道' ? 0 : 1;
       if (ga !== gb) return ga - gb;
-      return (a.no ?? 9999) - (b.no ?? 9999);
+      const pa = leaderPriority(a.name), pb = leaderPriority(b.name);
+      if (pa !== pb) return pa - pb;
+      // 同一天生日：若為同一家庭，改以家庭排行（familyOrder）決定順序
+      const sameFamilyOrder = (x, y) => {
+        if (x.family && x.family === y.family) return (x.familyOrder ?? 99) - (y.familyOrder ?? 99);
+        return (x.no ?? 9999) - (y.no ?? 9999);
+      };
+      return compareByBirthdateThenFallback(a, b, sameFamilyOrder);
     });
   }
 
@@ -1446,8 +1487,13 @@ function renderAttendGrid() {
   </td>`;
     codes.forEach(c => {
       const allNames = attending.filter(m=>m.role===r.role&&m.code===c);
-      const males   = allNames.filter(m=>m.gender==='乾道').map(m=>m.name);
-      const females = allNames.filter(m=>m.gender==='坤道').map(m=>m.name);
+      const byBirthdate = (a, b) => {
+        const pa = leaderPriority(a.name), pb = leaderPriority(b.name);
+        if (pa !== pb) return pa - pb;
+        return compareByBirthdateThenFallback(a, b, (x, y) => (x.no ?? 9999) - (y.no ?? 9999));
+      };
+      const males   = allNames.filter(m=>m.gender==='乾道').sort(byBirthdate).map(m=>m.name);
+      const females = allNames.filter(m=>m.gender==='坤道').sort(byBirthdate).map(m=>m.name);
       const renderGroup = (arr, color) => arr.map((n, i) => {
         const sep = i < arr.length - 1 ? '、' : '';
         const br  = (i + 1) % 3 === 0 && i < arr.length - 1 ? '<br>' : '';
@@ -1821,11 +1867,20 @@ function renderBento() {
     // 有 staffExtras（備餐附加）的家庭排在後面
     const hasStaffExtras = b => b.staffExtras && b.staffExtras.length > 0;
     const sortByFamilyIdx = (a, b) => {
+      const pa = leaderPriority(a.receiver), pb = leaderPriority(b.receiver);
+      if (pa !== pb) return pa - pb;
       const sa = hasStaffExtras(a) ? 1 : 0, sb = hasStaffExtras(b) ? 1 : 0;
       if (sa !== sb) return sa - sb;
-      const ia = familyFirstIndex[a.family] ?? 9999;
-      const ib = familyFirstIndex[b.family] ?? 9999;
-      return ia - ib;
+      const fallbackByFamilyIdx = () => {
+        const ia = familyFirstIndex[a.family] ?? 9999;
+        const ib = familyFirstIndex[b.family] ?? 9999;
+        return ia - ib;
+      };
+      // 除了原本依家庭在人員名單中出現順序排列外，再加入依代表人出生年月日排序
+      const ma = allMembers.find(x => x.name === a.receiver) || allMembers.find(x => x.name === a.family);
+      const mb = allMembers.find(x => x.name === b.receiver) || allMembers.find(x => x.name === b.family);
+      if (!ma || !mb) return fallbackByFamilyIdx();
+      return compareByBirthdateThenFallback(ma, mb, fallbackByFamilyIdx);
     };
     const sortByNo = sortByFamilyIdx;
 
@@ -1834,23 +1889,25 @@ function renderBento() {
       return sep + renderEntry(b);
     }).join('');
 
+    // 依便當領取代表人（receiver，找不到則退回 family）判斷乾坤／職位——1 個及多個便當皆共用
+    const getGender = b => {
+      const m = allMembers.find(x => x.name === b.receiver) || allMembers.find(x => x.name === b.family);
+      return m?.gender;
+    };
+    const getRole = b => {
+      const m = allMembers.find(x => x.name === b.receiver) || allMembers.find(x => x.name === b.family);
+      return m?.role;
+    };
+    const bentoRoleOrder = {'策劃':0,'陪班':1,'學員':2};
+    const sortByRoleThenFamily = (a, b) => {
+      const ra = bentoRoleOrder[getRole(a)] ?? 9, rb = bentoRoleOrder[getRole(b)] ?? 9;
+      if (ra !== rb) return ra - rb;
+      return sortByFamilyIdx(a, b);
+    };
+
     let nameStr = '';
     if (isOne) {
       // 1個便當：乾道（策劃→陪班→學員）一行，坤道（策劃→陪班→學員）一行
-      const getGender = b => {
-        const m = allMembers.find(x => x.name === b.family) || allMembers.find(x => x.name === b.receiver);
-        return m?.gender;
-      };
-      const getRole = b => {
-        const m = allMembers.find(x => x.name === b.family) || allMembers.find(x => x.name === b.receiver);
-        return m?.role;
-      };
-      const bentoRoleOrder = {'策劃':0,'陪班':1,'學員':2};
-      const sortByRoleThenFamily = (a, b) => {
-        const ra = bentoRoleOrder[getRole(a)] ?? 9, rb = bentoRoleOrder[getRole(b)] ?? 9;
-        if (ra !== rb) return ra - rb;
-        return sortByFamilyIdx(a, b);
-      };
       const notInListEntries1 = group.filter(b => b.notInList);
       const normalGroup1 = group.filter(b => !b.notInList);
       const males   = normalGroup1.filter(b => getGender(b) === '乾道').sort(sortByRoleThenFamily);
@@ -1860,11 +1917,14 @@ function renderBento() {
       if (females.length) nameStr += `<span style="display:inline;">${renderLine(females, 10)}</span>`;
       notInListEntries1.forEach(b => { if (nameStr) nameStr += '<br>'; nameStr += renderEntry(b); });
     } else {
-      // 多個便當：依人員名單家庭代表序號排列；notInList 換行附加在末尾
+      // 多個便當：同樣先乾道、後坤道分行，各自依人員名單家庭代表序號排列；notInList 換行附加在末尾
       const notInListEntries2 = group.filter(b => b.notInList);
       const normalGroup2 = group.filter(b => !b.notInList);
-      const sorted = [...normalGroup2].sort(sortByNo);
-      if (sorted.length) nameStr += `<span style="display:inline;">${renderLine(sorted, 3)}</span>`;
+      const males2   = normalGroup2.filter(b => getGender(b) === '乾道').sort(sortByNo);
+      const females2 = normalGroup2.filter(b => getGender(b) !== '乾道').sort(sortByNo);
+      if (males2.length)  nameStr += `<span style="display:inline;">${renderLine(males2, 3)}</span>`;
+      if (males2.length && females2.length) nameStr += '<br>';
+      if (females2.length) nameStr += `<span style="display:inline;">${renderLine(females2, 3)}</span>`;
       notInListEntries2.forEach(b => { if (nameStr) nameStr += '<br>'; nameStr += renderEntry(b); });
     }
 
