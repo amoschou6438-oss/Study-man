@@ -987,7 +987,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
         <div>請輸入備餐人員姓名，以頓號或逗號分隔。</div>
         <div style="color:var(--muted);font-size:0.82rem;">例如：文強、青黎、文森</div>
         <div style="margin-top:0.8rem;">如果是同一家庭的備餐人員，請用 <strong style="color:var(--teal);font-size:1rem;">＋</strong> 來表示。</div>
-        <div style="color:var(--muted);font-size:0.82rem;">例如：銀龍＋銀國＋碧純</div>
+        <div style="color:var(--muted);font-size:0.82rem;">例如：銀龍＋銀國＋碧純（顯示為：銀龍（銀國、碧純））</div>
       </div>
       <div class="modal-actions" style="margin-top:1.2rem;">
         <button class="btn-confirm" onclick="closeMealStaffHint()" style="padding:8px 32px;">✔ 我知道了</button>
@@ -2116,7 +2116,7 @@ function renderBento() {
       // 在名單中的＋組：明雄(周易、蘭妹)備餐 — 所有名字用金色
       const othersGold = others.map(n => `<span style="color:#8B6914;font-weight:700;">${n}</span>`);
       const inner = othersGold.length > 0
-        ? `<span style="color:#8B6914;font-weight:700;">${b.receiver}</span>(${othersGold.join('、')})${staffTag}`
+        ? `<span style="color:#8B6914;font-weight:700;">${b.receiver}</span>（${othersGold.join('、')}）${staffTag}`
         : `<span style="color:#8B6914;font-weight:700;">${b.receiver}</span>${staffTag}`;
       return `<span style="white-space:nowrap;">${inner}</span>`;
     }
