@@ -1869,6 +1869,44 @@ function calcBentoTotal() {
   return base + staff;
 }
 
+/** 備餐人員若屬同一家庭（依人員名單的家庭欄位），自動併成同一組並依家庭順序排列，例如 銀國、碧純 → 銀國+碧純 */
+function mergeStaffFamilyGroups(groupsNames) {
+  const roleOrd = { '資輔': 0, '家長': 1, '學輔': 2, '小學輔': 3, '學員': 4 };
+  const find = n => allMembers.find(m => m.name === n);
+  const fam = n => { const m = find(n); return m && m.family ? m.family : null; };
+  const cmp = (a, b) => {
+    const ma = find(a), mb = find(b);
+    const ra = roleOrd[ma?.role] ?? 9, rb = roleOrd[mb?.role] ?? 9;
+    if (ra !== rb) return ra - rb;
+    const oa = ma?.familyOrder ?? 99, ob = mb?.familyOrder ?? 99;
+    if (oa !== ob) return oa - ob;
+    return ma && mb ? compareBirthdate(ma, mb) : (ma?.no ?? 9999) - (mb?.no ?? 9999);
+  };
+  const out = [], famIdx = {};
+  groupsNames.forEach(names => {
+    let target = -1;
+    for (const n of names) {
+      const f = fam(n);
+      if (f !== null && famIdx[f] !== undefined) { target = famIdx[f]; break; }
+    }
+    if (target === -1) {
+      out.push({ names: [...names], merged: false });
+      const i = out.length - 1;
+      names.forEach(n => { const f = fam(n); if (f !== null && famIdx[f] === undefined) famIdx[f] = i; });
+    } else {
+      const g = out[target];
+      names.forEach(n => {
+        if (!g.names.includes(n)) g.names.push(n);
+        const f = fam(n);
+        if (f !== null && famIdx[f] === undefined) famIdx[f] = target;
+      });
+      g.merged = true;
+    }
+  });
+  out.forEach(g => { if (g.merged) g.names.sort(cmp); });
+  return out.map(g => g.names);
+}
+
 function renderBento() {
   saveData();
 
@@ -1952,6 +1990,7 @@ function renderBento() {
   // { members:[name,...], isPlus:bool }
   const staffGroups = [];
   let sgIdx = 0;
+  const _rawStaffGroups = [];
   staffNamesRaw
     .split(/[、,，\n]/)
     .map(s => s.trim())
@@ -1959,8 +1998,11 @@ function renderBento() {
     .forEach(seg => {
       const parts = seg.split(/[＋+]/).map(s => s.trim()).filter(Boolean);
       if (!parts.length) return;
-      staffGroups.push({ members: parts, isPlus: parts.length > 1, gKey: `sg${sgIdx++}` });
+      _rawStaffGroups.push(parts);
     });
+  mergeStaffFamilyGroups(_rawStaffGroups).forEach(parts => {
+    staffGroups.push({ members: parts, isPlus: parts.length > 1, gKey: `sg${sgIdx++}` });
+  });
 
   // staffBentoCount = 全部名字總數（每人1份），扣除選擇不要便當的備餐人員
   const staffBentoCount = staffGroups.reduce((s, g) => s + g.members.filter(n => !staffNoBento.has(n)).length, 0);
@@ -1982,16 +2024,47 @@ function renderBento() {
     if (isPlus) {
       // ── 規則B：＋組 → 幾個名字就幾份便當，第一人為代表，備餐標籤在括號後面 ──
       // 不論是否在人員名單中，都列入對應份數的便當行
-      const cnt = members.length;
-      const receiver = members[0];
-      const otherStaff = members.slice(1);
-      const allNotInList = members.every(n => !allMembers.find(m => m.name === n));
+      // 同家庭若有人參班 → 一併列入該家庭行（staffExtras），其餘才獨立成「備餐」組
+      const restMembers = [];
+      members.forEach(name => {
+        const rec = allMembers.find(m => m.name === name);
+        const famName = rec ? (rec.family || name) : null;
+        const famAtt = rec ? allMembers.filter(m =>
+          m.family === famName && m.attend && !noBentoValid.includes(m.name) && !staffNamesEarly.has(m.name)
+        ) : [];
+        let fEntry = null;
+        if (rec && famAtt.length > 0) {
+          fEntry = allData.find(b => b.family === famName);
+          if (!fEntry) {
+            const an = famAtt.map(m => m.name);
+            fEntry = allData.find(b => an.includes(b.receiver));
+          }
+        }
+        if (fEntry) {
+          if (!staffNoBento.has(name)) {
+            if (!fEntry.staffExtras) fEntry.staffExtras = [];
+            fEntry.staffExtras.push(name);
+            fEntry.count = famAtt.length + fEntry.staffExtras.length;
+          }
+        } else {
+          restMembers.push(name);
+        }
+      });
+      if (restMembers.length === 1) {
+        if (!staffNoBento.has(restMembers[0])) soloStaffNames.push(restMembers[0]);
+        return;
+      }
+      if (restMembers.length === 0) return;
+      const cnt = restMembers.length;
+      const receiver = restMembers[0];
+      const otherStaff = restMembers.slice(1);
+      const allNotInList = restMembers.every(n => !allMembers.find(m => m.name === n));
       const entry = {
         no: 9000 + gi * 100,
         family: receiver,
         receiver,
         count: cnt,
-        members: members.join('、'),
+        members: restMembers.join('、'),
         isStaff: true,
         notInList: allNotInList,   // 全部不在名單中 → 換行顯示「備餐：代表（其他）」
         staffOthers: otherStaff
@@ -3897,6 +3970,98 @@ document.querySelectorAll('.hc').forEach(function(b){
     b.addEventListener('mouseenter',function(){ g.classList.add('hot'); });
     b.addEventListener('mouseleave',function(){ g.classList.remove('hot'); });
   });
+})();
+</script>
+
+<script>
+/* 長按姓名 3 秒 → 自動加入備餐人員 */
+(function(){
+  var HOLD_MS = 3000, timer = null, startX = 0, startY = 0, fired = false, target = null;
+  function chipName(chip){
+    var n = chip.firstChild && chip.firstChild.nodeType === 3 ? chip.firstChild.textContent : chip.textContent;
+    return (n || '').trim();
+  }
+  function isAttendChip(chip){
+    var oc = chip.getAttribute('onclick') || '';
+    return oc.indexOf('toggleAttendIdx') !== -1;
+  }
+  function toast(msg){
+    var t = document.createElement('div');
+    t.textContent = msg;
+    t.style.cssText = 'position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:rgba(30,50,60,.92);color:#fff;padding:.6rem 1.1rem;border-radius:20px;font-size:.9rem;z-index:99999;pointer-events:none;';
+    document.body.appendChild(t);
+    setTimeout(function(){ t.remove(); }, 2200);
+  }
+  function addStaff(name){
+    var el = document.getElementById('meal-staff-names');
+    if (!el || !name) return;
+    var strip = function(n){ return (n || '').trim().replace(/[＊*]+$/, '').replace(/[（(].*$/, '').trim(); };
+    var segs = el.value.split(/[、,，\n]/).map(function(s){ return s.trim(); }).filter(Boolean);
+    var already = segs.some(function(seg){ return seg.split(/[+＋]/).some(function(n){ return strip(n) === name; }); });
+    if (already) { toast(name + ' 已是備餐人員'); return; }
+    var roleOrd = { '資輔':0, '家長':1, '學輔':2, '小學輔':3, '學員':4 };
+    var find = function(n){ return allMembers.find(function(m){ return m.name === strip(n); }); };
+    var cmp = function(a, b){
+      var ma = find(a), mb = find(b);
+      var ra = roleOrd[ma && ma.role]; ra = ra === undefined ? 9 : ra;
+      var rb = roleOrd[mb && mb.role]; rb = rb === undefined ? 9 : rb;
+      if (ra !== rb) return ra - rb;
+      var oa = ma && ma.familyOrder != null ? ma.familyOrder : 99;
+      var ob = mb && mb.familyOrder != null ? mb.familyOrder : 99;
+      if (oa !== ob) return oa - ob;
+      if (ma && mb && typeof compareBirthdate === 'function') return compareBirthdate(ma, mb);
+      return ((ma && ma.no) || 9999) - ((mb && mb.no) || 9999);
+    };
+    var mem = allMembers.find(function(m){ return m.name === name; });
+    var idx = -1;
+    if (mem && mem.family) {
+      idx = segs.findIndex(function(seg){
+        return seg.split(/[+＋]/).some(function(n){ var x = find(n); return x && x.family === mem.family; });
+      });
+    }
+    var merged = '';
+    if (idx !== -1) {
+      var parts = segs[idx].split(/[+＋]/).map(function(s){ return s.trim(); }).filter(Boolean);
+      parts.push(name);
+      parts.sort(cmp);
+      segs[idx] = parts.join('+');
+      merged = segs[idx];
+    } else {
+      segs.push(name);
+    }
+    el.value = segs.join('、');
+    try { if (typeof saveData === 'function') saveData(); } catch(e){}
+    try { if (typeof renderBento === 'function') renderBento(); } catch(e){}
+    toast(merged ? ('✓ 已併入同家庭備餐：' + merged) : ('✓ ' + name + ' 已加入備餐人員'));
+    if (navigator.vibrate) navigator.vibrate(60);
+  }
+  function cancel(){ if (timer) { clearTimeout(timer); timer = null; } }
+  document.addEventListener('pointerdown', function(e){
+    var chip = e.target.closest && e.target.closest('.roster-name-chip');
+    if (!chip || !isAttendChip(chip)) return;
+    fired = false; target = chip; startX = e.clientX; startY = e.clientY;
+    cancel();
+    timer = setTimeout(function(){
+      timer = null; fired = true;
+      addStaff(chipName(chip));
+    }, HOLD_MS);
+  }, true);
+  document.addEventListener('pointermove', function(e){
+    if (timer && (Math.abs(e.clientX - startX) > 10 || Math.abs(e.clientY - startY) > 10)) cancel();
+  }, true);
+  ['pointerup','pointercancel','pointerleave'].forEach(function(ev){
+    document.addEventListener(ev, cancel, true);
+  });
+  // 長按完成後，吞掉隨後的 click，避免同時切換出席
+  document.addEventListener('click', function(e){
+    if (fired) { e.stopPropagation(); e.preventDefault(); fired = false; }
+  }, true);
+  document.addEventListener('contextmenu', function(e){
+    if (e.target.closest && e.target.closest('.roster-name-chip')) e.preventDefault();
+  });
+  var st = document.createElement('style');
+  st.textContent = '.roster-name-chip{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;}';
+  document.head.appendChild(st);
 })();
 </script>
 </body>
